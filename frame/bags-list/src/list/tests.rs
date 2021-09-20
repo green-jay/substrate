@@ -374,6 +374,180 @@ mod list {
 			assert!(non_existent_ids.iter().all(|id| !List::<Runtime>::contains(id)));
 		})
 	}
+
+	#[test]
+	fn put_in_front_of_with_two_node_bag() {
+		ExtBuilder::default().add_ids(vec![(710, 15), (711, 16)]).build_and_execute(|| {
+			// given
+			assert_eq!(
+				List::<Runtime>::get_bags(),
+				vec![(10, vec![1]), (20, vec![710, 711]), (1_000, vec![2, 3, 4])]
+			);
+
+			assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&710), 15);
+			assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&711), 16);
+
+			let weight_fn = Box::new(<Runtime as Config>::VoteWeightProvider::vote_weight);
+			// when
+			assert_ok!(List::<Runtime>::put_in_front_of(&710, &711, weight_fn));
+
+			// then
+			assert_eq!(
+				List::<Runtime>::get_bags(),
+				vec![(10, vec![1]), (20, vec![711, 710]), (1_000, vec![2, 3, 4])]
+			);
+		});
+	}
+
+	#[test]
+	fn put_in_front_of_with_non_terminal_nodes() {
+		// node - lighter - heavier - node
+		ExtBuilder::default()
+			.add_ids(vec![(11, 20), (710, 15), (711, 16), (12, 20)])
+			.build_and_execute(|| {
+				// given
+				assert_eq!(
+					List::<Runtime>::get_bags(),
+					vec![(10, vec![1]), (20, vec![11, 710, 711, 12]), (1_000, vec![2, 3, 4])]
+				);
+
+				assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&710), 15);
+				assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&711), 16);
+
+				let weight_fn = Box::new(<Runtime as Config>::VoteWeightProvider::vote_weight);
+				// when
+				assert_ok!(List::<Runtime>::put_in_front_of(&710, &711, weight_fn));
+
+				// then
+				assert_eq!(
+					List::<Runtime>::get_bags(),
+					vec![(10, vec![1]), (20, vec![11, 711, 710, 12]), (1_000, vec![2, 3, 4])]
+				);
+			});
+	}
+
+	#[test]
+	fn put_in_front_of_with_lighter_as_head() {
+		// lighter - heavier - node
+		ExtBuilder::default()
+			.add_ids(vec![(710, 15), (711, 16), (12, 20)])
+			.build_and_execute(|| {
+				// given
+				assert_eq!(
+					List::<Runtime>::get_bags(),
+					vec![(10, vec![1]), (20, vec![710, 711, 12]), (1_000, vec![2, 3, 4])]
+				);
+
+				assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&710), 15);
+				assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&711), 16);
+
+				let weight_fn = Box::new(<Runtime as Config>::VoteWeightProvider::vote_weight);
+				// when
+				assert_ok!(List::<Runtime>::put_in_front_of(&710, &711, weight_fn));
+
+				// then
+				assert_eq!(
+					List::<Runtime>::get_bags(),
+					vec![(10, vec![1]), (20, vec![711, 710, 12]), (1_000, vec![2, 3, 4])]
+				);
+			});
+	}
+
+	#[test]
+	fn put_in_front_of_with_heavier_as_tail() {
+		// node - lighter - tail
+		ExtBuilder::default()
+			.add_ids(vec![(11, 20), (710, 15), (711, 16)])
+			.build_and_execute(|| {
+				// given
+				assert_eq!(
+					List::<Runtime>::get_bags(),
+					vec![(10, vec![1]), (20, vec![11, 710, 711]), (1_000, vec![2, 3, 4])]
+				);
+
+				assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&710), 15);
+				assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&711), 16);
+
+				let weight_fn = Box::new(<Runtime as Config>::VoteWeightProvider::vote_weight);
+				// when
+				assert_ok!(List::<Runtime>::put_in_front_of(&710, &711, weight_fn));
+
+				// then
+				assert_eq!(
+					List::<Runtime>::get_bags(),
+					vec![(10, vec![1]), (20, vec![11, 711, 710]), (1_000, vec![2, 3, 4])]
+				);
+			});
+	}
+
+	#[test]
+	fn put_in_front_of_with_heavier_and_lighter_terminal_multiple_middle_nodes() {
+		// lighter - node - node - heavier
+		ExtBuilder::default()
+			.add_ids(vec![(710, 15), (11, 20), (12, 20), (711, 16)])
+			.build_and_execute(|| {
+				// given
+				assert_eq!(
+					List::<Runtime>::get_bags(),
+					vec![(10, vec![1]), (20, vec![710, 11, 12, 711]), (1_000, vec![2, 3, 4])]
+				);
+
+				assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&710), 15);
+				assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&711), 16);
+
+				let weight_fn = Box::new(<Runtime as Config>::VoteWeightProvider::vote_weight);
+				// when
+				assert_ok!(List::<Runtime>::put_in_front_of(&710, &711, weight_fn));
+
+				// then
+				assert_eq!(
+					List::<Runtime>::get_bags(),
+					vec![(10, vec![1]), (20, vec![711, 11, 12, 710]), (1_000, vec![2, 3, 4])]
+				);
+			});
+	}
+
+	#[test]
+	fn put_in_front_of_exits_early_if_heavier_is_less_than_lighter() {
+		// heavier - lighter
+		ExtBuilder::default().add_ids(vec![(710, 15), (711, 16)]).build_and_execute(|| {
+			// given
+			assert_eq!(
+				List::<Runtime>::get_bags(),
+				vec![(10, vec![1]), (20, vec![710, 711]), (1_000, vec![2, 3, 4])]
+			);
+
+			assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&710), 15);
+			assert_eq!(<Runtime as Config>::VoteWeightProvider::vote_weight(&711), 16);
+
+			let weight_fn = Box::new(<Runtime as Config>::VoteWeightProvider::vote_weight);
+			// then
+			assert_storage_noop!(assert_eq!(
+				List::<Runtime>::put_in_front_of(&711, &710, weight_fn).unwrap_err(),
+				crate::pallet::Error::<Runtime>::NotHeavier
+			));
+		});
+	}
+
+	// #[test]
+	// fn put_in_front_of_exits_early_if_nodes_not_found() {
+	// 	todo!()
+	// }
+
+	// #[test]
+	// fn put_in_front_of_exits_early_if_nodes_not_in_same_bag() {
+	// 	todo!()
+	// }
+
+	// #[test]
+	// fn put_in_front_of_exits_early_if_no() {
+	// 	todo!()
+	// }
+
+	// #[test]
+	// fn put_in_front_of_panics_if_bag_not_found() {
+	// 	todo!()
+	// }
 }
 
 mod bags {

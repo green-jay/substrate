@@ -178,6 +178,21 @@ pub mod pallet {
 		Rebagged(T::AccountId, VoteWeight, VoteWeight),
 	}
 
+	#[pallet::error]
+	#[cfg_attr(test, derive(PartialEq))]
+	pub enum Error<T> {
+		/// Attempted to place node in front of a node in another bag.
+		NotInSameBag,
+		/// Id not found in list
+		IdNotFound,
+		/// Does not have a greater vote weight than the node it was placed in front of.
+		NotHeavier,
+		/// Higher weight node is already in a higher position than the the lesser weight node.
+		AlreadyHigherPosition,
+		/// Bag could not be found. This is a system logic error that should never happen.
+		BagNotFound,
+	}
+
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Declare that some `dislocated` account has, through rewards or penalties, sufficiently
@@ -194,6 +209,21 @@ pub mod pallet {
 			let current_weight = T::VoteWeightProvider::vote_weight(&dislocated);
 			let _ = Pallet::<T>::do_rebag(&dislocated, current_weight);
 			Ok(())
+		}
+
+		#[pallet::weight(12345)]
+		pub fn put_in_front_of(
+			origin: OriginFor<T>,
+			heavier: T::AccountId,
+			lighter: T::AccountId,
+		) -> DispatchResult {
+			ensure_signed(origin)?;
+			List::<T>::put_in_front_of(
+				&heavier,
+				&lighter,
+				Box::new(T::VoteWeightProvider::vote_weight),
+			)
+			.map_err(Into::into)
 		}
 	}
 
